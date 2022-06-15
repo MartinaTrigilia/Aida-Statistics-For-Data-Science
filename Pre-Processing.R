@@ -1,7 +1,11 @@
+# authors: Giovanni Scognamiglio; Martina Trigilia
+
 # Load library
 library(tidyverse)
 library(plyr)
 library(hash)
+library(readxl)
+library(xlsx)
 ###########
 # AIDA data loading
 ###########
@@ -13,6 +17,7 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 # to reload the whole dataset at once, run
 load("aida.RData")
+
 # View(aida)
 # summaries
 
@@ -54,6 +59,25 @@ aida <- aida[!(aida$Age<0),]
 
 # FARE PRE-PROCESSIG DELLA VARIABILE AGE ---
 
+# LOCATION
+
+regioni_istat <- read_excel("Elenco-comuni-italiani.xls")
+
+regioni_istat <- unique(regioni_istat[, c('Denominazione Regione', 'Ripartizione geografica')])
+
+names(regioni_istat)[names(regioni_istat) == 'Denominazione Regione'] <- "Registered.office.address...Region"
+
+#convert region variable to character
+aida$Registered.office.address...Region <- as.character(aida$Registered.office.address...Region)
+
+aida <- merge(regioni_istat,aida,by="Registered.office.address...Region")
+
+names(aida)[names(aida) == 'Ripartizione geografica'] <- "Location"
+
+#make location a factor
+aida$Location <- as.factor(aida$Location)
+
+levels(aida$Location)
 
 # PRE-PROCESSING VARIABILE ATECO
 
@@ -140,6 +164,11 @@ aida$ATECO.NAME <- sapply(aida$ATECO.2007code, get_ATECO.NAME)
 # set ATECO.NAME as a factor
 aida$ATECO.NAME <- as.factor(aida$ATECO.NAME)
 
+aida.name_toremove <- c("O - Amministrazione Pubblica", "U - Organizzazione Extraterritoriali", "T - Attività Familiari")
+
+aida <- aida[!(aida$ATECO.NAME %in% aida.name_toremove),] 
+
+aida$ATECO.NAME <- droplevels(aida$ATECO.NAME)
 
 # CREAZIONE E PRE-PROCESSIG DELLA VARIABILE SIZE
 aida$Size <- ifelse(aida$Total.assetsth.EURLast.avail..yr==0, 0,log(aida$Total.assetsth.EURLast.avail..yr))
@@ -153,14 +182,7 @@ uplim = quan[2]+2*iqr
 
 aida = data.frame(aida[aida$Size>lowlim & aida$Size<uplim,
                        c('Size','Failed','Last.accounting.closing.date',
-                         'Legal.form', 'ATECO.NAME', 'Age')])
-
-aidaAge = data.frame(aida[aida$Size>lowlim & aida$Size<uplim,
-                       c('Size','Failed','Last.accounting.closing.date',
-                         'Legal.form', 'ATECO.NAME', 'Age')])
+                         'Legal.form', 'ATECO.NAME', 'Age', 'Location')])
 
 
 save(aida, file = "aida.clean.RData")
-save(aida, file = "aidaAge.clean.RData")
-save(aida, file = "aidaSize.clean.RData")
-
