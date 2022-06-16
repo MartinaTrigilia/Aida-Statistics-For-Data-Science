@@ -12,8 +12,6 @@ library(plotrix)
 library(ggplot2)
 
 
-
-
 #get samples function
 tryf = function(data,n) {
   fhat = kde(data)
@@ -63,17 +61,17 @@ lines(density(fullSizeY), col="blue")
 
 length(fullSizeX);length(fullSizeY);
 
-# we reject that both sample come the same distribution
-
 # ks.test(sX, sY) # D = 0.025, p-value = 0.9135
 
- ks.test(fullSizeX, fullSizeY) # D = 0.0188, p-value = 2.877e-07
+# we reject H0, that both sample come the same distribution
+ks.test(fullSizeX, fullSizeY) # D = 0.0188, p-value = 2.877e-07
 
 ### GENERAL DATA
 
-z.test(fullSizeX, fullSizeY, sigma.x=sd(fullSizeX), sigma.y=sd(fullSizeY)) # p-value = 0.0004778 (95%CI: 0.02111638 0.07511316)
+# we reject H0, that the samples have the same mean
+z.test(fullSizeX, fullSizeY, sigma.x=sd(fullSizeX), sigma.y=sd(fullSizeY)) # p-value = 0.0004778 (95%CI: 0.1103032 0.1650406)
 
-# wilcox.test(fullSizeX, fullSizeY, conf.int = T) # p-value = 2.004e-05,  95%CI(0.03241141 0.08756097), DELTA: 0.05999382
+wilcox.test(fullSizeX, fullSizeY, conf.int = T) # p-value = 2.004e-05,  95%CI(0.03241141 0.08756097), DELTA: 0.05999382
 
 
 # Exclude Other from the analysis, in year 2014 there are not sufficient records to apply for the assumption of large sample
@@ -94,8 +92,8 @@ m_form <- length(industry_form)
 bonf_alfa.form <- 1-(0.05/m_form)
 
 locations <- levels(aida$Location)
-# Bonferroni Correction For Multi Test  on Location
 
+# Bonferroni Correction For Multi Test  on Location
 m_loc <- nlevels(aida$Location)
 bonf_alfa.loc <- 1-(0.05/m_loc)
 
@@ -111,7 +109,7 @@ get_ztest.location = function(location, aida_attr){
   fullY = aida_attr[year_Y & aida_location]
   
   print(location)
-  
+ 
   # large sample, general data assum. 
   ztest <- z.test(fullX, fullY, sigma.x=sd(fullX), sigma.y=sd(fullY), conf.level = bonf_alfa.loc)
   
@@ -131,16 +129,30 @@ get_ztest.form = function(form, aida_attr){
   fullY = aida_attr[year_Y & aida_form]
   
   print(form)
-  # large sample, general data assum. 
+  # same shape test for wilcox assumption
   
-  ztest <- z.test(fullX, fullY, sigma.x=sd(fullX), sigma.y=sd(fullY), conf.level = bonf_alfa.form)
+  Z = mean(fullX) - mean(fullY)
+  fullX_adjusted = fullX - Z
+ 
+  ks.test(fullX_adjusted,fullY)
   
-  return(ztest)
+  res_kstest<- ks.test(fullX_adjusted,fullY)
+  res_kstest.pval <- res_kstest$p.value
+  same_shape <- (res_kstest.pval >= 0.05)
+  
+  if (same_shape) {    
+    test_list <- wilcox.test(fullX, fullY, conf.int = T, conf.level = bonf_alfa.form ) 
+    
+    # we also tested without continuity correction for normality
+    # test_list <- wilcox.test(fullX, fullY, conf.int = T, conf.level = bonf_alfa.form, correct=F )
+  }
+  else 
+    # large sample, general data assum. 
+    test_list <- z.test(fullX, fullY, sigma.x=sd(fullX), sigma.y=sd(fullY), conf.level = bonf_alfa.form)
+  
+  return(test_list)
   
 }
-
-
-
 
 ########### QUESTION B. 1 ######## SIZE
 
