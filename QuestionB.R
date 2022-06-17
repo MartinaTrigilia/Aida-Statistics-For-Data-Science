@@ -110,10 +110,25 @@ get_ztest.location = function(location, aida_attr){
   
   print(location)
  
-  # large sample, general data assum. 
-  ztest <- z.test(fullX, fullY, sigma.x=sd(fullX), sigma.y=sd(fullY), conf.level = bonf_alfa.loc)
+  # same shape test for wilcox assumption
   
-  return(ztest)
+  Z = mean(fullX) - mean(fullY)
+  fullX_adjusted = fullX - Z
+  
+  ks.test(fullX_adjusted,fullY)
+  
+  res_kstest<- ks.test(fullX_adjusted,fullY)
+  res_kstest.pval <- res_kstest$p.value
+  same_shape <- (res_kstest.pval >= 0.05)
+  
+  if (same_shape) {    
+    test_list <- wilcox.test(fullX, fullY, conf.int = T, conf.level = bonf_alfa.form ) # p-value = 2.004e-05,  95%CI(0.03241141 0.08756097), DELTA: 0.05999382
+  }
+  else 
+    # large sample, general data assum. 
+    test_list <- z.test(fullX, fullY, sigma.x=sd(fullX), sigma.y=sd(fullY), conf.level = bonf_alfa.form)
+  
+  return(test_list)
   
 }
 
@@ -141,10 +156,7 @@ get_ztest.form = function(form, aida_attr){
   same_shape <- (res_kstest.pval >= 0.05)
   
   if (same_shape) {    
-    test_list <- wilcox.test(fullX, fullY, conf.int = T, conf.level = bonf_alfa.form ) 
-    
-    # we also tested without continuity correction for normality
-    # test_list <- wilcox.test(fullX, fullY, conf.int = T, conf.level = bonf_alfa.form, correct=F )
+    test_list <- wilcox.test(fullX, fullY, conf.int = T, conf.level = bonf_alfa.form ) # p-value = 2.004e-05,  95%CI(0.03241141 0.08756097), DELTA: 0.05999382
   }
   else 
     # large sample, general data assum. 
@@ -156,18 +168,17 @@ get_ztest.form = function(form, aida_attr){
 
 ########### QUESTION B. 1 ######## SIZE
 
-z_list.form_size <- sapply(industry_form, get_ztest.form, aida$Size) 
+t_list.form_size <- sapply(industry_form, get_ztest.form, aida$Size) 
 
-z_list.form_size['conf.int',]
+t_list.form_size['conf.int',]
 
 # z_list.form_size['conf.int',]$Consortium[[2]]
 
 ########### QUESTION B.2 ######## SIZE
 
-z_list.loc_size <- sapply(locations, get_ztest.location, aida$Size) 
+t_list.loc_size <- sapply(locations, get_ztest.location, aida$Size) 
 
-z_list.loc_size['conf.int',]
-
+t_list.loc_size['conf.int',]
 
 
 ############ QUESTION 1.0############# AGE #######
@@ -220,6 +231,4 @@ z_list.loc_age <- sapply(locations, get_ztest.location, aida$Age)
 z_list.loc_age['conf.int',]
 
 
-
-
-
+######### QUESTION C ##########
