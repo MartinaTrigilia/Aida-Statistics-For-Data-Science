@@ -3,8 +3,6 @@
 # Course  : Statistics For Data Science
 # Teacher : Salvatore Ruggieri 
 
-##########
-
 #lib and functions
 library(DescTools)
 library(ks)
@@ -109,13 +107,33 @@ ageCondLocation <- data.frame (
 colnames(ageCondLocation) <- c("Age", "PFailedAgeCentro", "PFailedAgesole", "PFailedAgeNordest",
                               "PFailedAgeNordovest","PFailedAgeSud")
 
-plot(density(ageCondLocation$PFailedAgeNordovest))
+plot(density(ageCondLocation$PFailedAgeNordovest), main = "P(Failed=Yes | Age= x & Location = y) in 2016", col=1)
 lines(density(ageCondLocation$PFailedAgeCentro), col=2)
 lines(density(ageCondLocation$PFailedAgesole), col=3)
 lines(density(ageCondLocation$PFailedAgeNordest), col=4)
-lines(density(ageCondLocation$PFailedAgeNordovest), col=5)
-lines(density(ageCondLocation$PFailedAgeSud), col=6)
+lines(density(ageCondLocation$PFailedAgeSud), col=5)
+lines(density(ageCond$probability), col=6)
+legend("topright", legend = c("Nord-Ovest", "Centro", "Isole", "Nord-Est", "Sud"),
+       lwd = 3, col = c(1, 2, 3, 4, 5, 6))
 
-t.test(ageCondLocation$PFailedAgeSud,ageCondLocation$PFailedAgeNordovest)
+plot(x=ageCondLocation$Age, y=ageCondLocation$PFailedAgeSud)
 
+# Bonferroni Correction For Multi Test on Location
+m_loc <- nlevels(aida$Location)
+bonf_alfa.loc <- 1-(0.05/m_loc)
+
+probAge <- ageCond$probability
+
+get_ztest.location = function(ageCondLoc){
+  
+  test_list <- z.test(probAgeLoc, probAge, sigma.x=sd(probAgeLoc), sigma.y=sd(probAge), conf.level = bonf_alfa.loc)
+
+  return(test_list)
+}
+
+ageCondLoc <- ageCondLocation[c("PFailedAgeCentro", "PFailedAgesole", "PFailedAgeNordest","PFailedAgeNordovest","PFailedAgeSud")]
+
+t_list.location <- sapply(ageCondLoc, get_ztest.location) 
+
+t_list.location['conf.int',]
 
