@@ -1,8 +1,9 @@
-#15/06
 
-# authors: Giovanni Scognamiglio; Martina Trigilia
-##########
-#lib and functions
+# Authors : Giovanni Scognamiglio and Martina Trigilia
+# Course  : Statistics For Data Science
+# Teacher : Salvatore Ruggieri 
+
+
 library(DescTools)
 library(ks)
 library(BSDA)
@@ -10,6 +11,7 @@ library(nortest)
 library(tseries)
 library(plotrix)  
 library(ggplot2)
+library(cowplot)
 
 
 #get samples function
@@ -19,6 +21,7 @@ tryf = function(data,n) {
   ks_res = ks.test(samp,data)
   return(list('ks_res'=ks_res,'samp'=samp))
 }
+
 get_best_sample = function(data, n) {
   smallest_d = 1
   for (x in 1:10) {
@@ -33,10 +36,9 @@ get_best_sample = function(data, n) {
   return(best_ns0)
 }
 
-load('aida.clean.RData')
+load('aida.Finale.RData')
 
 # let's fix the Failed at 1
-
 aida <- aida[aida$Failed==1,]
 
 ggplot(aida, aes(x = Last.accounting.closing.date)) +
@@ -45,36 +47,70 @@ ggplot(aida, aes(x = Last.accounting.closing.date)) +
 year_X = aida$Last.accounting.closing.date==2014
 
 year_Y = aida$Last.accounting.closing.date==2016
+aida_X = aida[aida$Last.accounting.closing.date==2014,]
+aida_Y = aida[aida$Last.accounting.closing.date==2016,]
 
-############ QUESTION 1.0 ############ #### SIZE ###
+### PLOT SIZE and AGE Distribution
+aida_new = aida[aida$Last.accounting.closing.date %in% c(2014,2016),]
+aida_new = aida_new[aida_new$Legal.form %in% industry_form,]
+
+colnames(aida_new)[which(names(aida_new) == "Last.accounting.closing.date")] <- "Year"  
+aida_new$Year <- as.factor(aida_new$Year)
+
+size_dens1 <- ggplot(aida_new, aes(x=Size, color=Year)) +
+  geom_density()
+
+age_dens1 <- ggplot(aida_new, aes(x=Age, color=Year)) +
+  geom_density()
+
+plot_grid(size_dens1, age_dens1, labels = "AUTO")
+
+# PLOTS LEGAL FORM
+ggplot(aida_new[aida_new$Legal.form=="S.R.L. simplified",], aes(x=Size, color=Year)) +
+  geom_density()
+
+ggplot(aida_new[aida_new$Location=="S.R.L. simplified",], aes(x=Age, color=Year)) +
+  geom_density()
+
+
+############ QUESTION 1.0 SIZE ############ 
 
 # let's take the two distribution of Size to compare
 
-fullSizeX = aida$Size[year_X]
-fullSizeY = aida$Size[year_Y]
-
-# sX = get_best_sample(fullSizeX,1000)
-# sY = get_best_sample(fullSizeY,1000)
-
-plot(density(fullSizeX))
-lines(density(fullSizeY), col="blue")
-
-length(fullSizeX);length(fullSizeY);
-
-# ks.test(sX, sY) # D = 0.025, p-value = 0.9135
+aida_SX = aida_X$Size
+aida_SY = aida_Y$Size
 
 # we reject H0, that both sample come the same distribution
-ks.test(fullSizeX, fullSizeY) # D = 0.0188, p-value = 2.877e-07
+ks.test(aida_SX, aida_SY) # D = 0.022567, p-value = 6.003e-10
 
-### GENERAL DATA
+#checking for normality
+
+qqnorm(aida_SX, pch = 1, frame = FALSE)
+qqline(aida_SX, col = "steelblue", lwd = 2)
+
+qqnorm(aida_SY, pch = 1, frame = FALSE)
+qqline(aida_SY, col = "steelblue", lwd = 2)
+
+#extracting smaller samples
+sX = get_best_sample(aida_SX,5000)
+sY = get_best_sample(aida_SY,5000)
+
+shX <- shapiro.test(sX) #p-value = 0.01687
+shY <- shapiro.test(sY) #p-value = 0.0007962
+
+### GENERAL DATA assumption.
 
 # we reject H0, that the samples have the same mean
-z.test(fullSizeX, fullSizeY, sigma.x=sd(fullSizeX), sigma.y=sd(fullSizeY)) # p-value = 0.0004778 (95%CI: 0.1103032 0.1650406)
+z.test(aida_SX, aida_SY, sigma.x=sd(aida_SX), sigma.y=sd(aida_SY)) # p-value = 2.2e-16 (95%CI: 0.112 0.170)
 
-wilcox.test(fullSizeX, fullSizeY, conf.int = T) # p-value = 2.004e-05,  95%CI(0.03241141 0.08756097), DELTA: 0.05999382
+Z = mean(aida_SX) - mean(aida_SY)
+fullX_adjusted = aida_SX - Z
 
+ks.test(fullX_adjusted,aida_SY)
 
-# Exclude Other from the analysis, in year 2014 there are not sufficient records to apply for the assumption of large sample
+wilcox.test(aida_SX, aida_SY, conf.int = T) # p-value =2.2e-16,  95%CI(0.01 0.15), DELTA: 0.122
+
+# every sample has large sample size, so we can apply for general assump. 
 table(aida$Legal.form[year_X])
 table(aida$Legal.form[year_Y])
 
@@ -83,19 +119,18 @@ table(aida$Location[year_Y])
 
 # CALCULATE BONFERRONI CORRECTION ON CI FOR LEGAL FORM AND LOCATION
 
-industry_form <- c("Consortium","S.R.L.", "S.P.A.","S.C.A.R.L.P.A.", "S.R.L. one-person", "S.C.A.R.L.",
-                                    "S.R.L. simplified", "Social cooperative company", "S.A.S.", "S.N.C.")
+industry_form <- c("Consortium","S.C.A.R.L.", "S.P.A.", "S.R.L.", "S.R.L. one-person")
 
 # Bonferroni Correction For Multi Test on Legal Form
-
-m_form <- length(industry_form)
+m_form <- length(industry_form) + 1
 bonf_alfa.form <- 1-(0.05/m_form)
 
 locations <- levels(aida$Location)
 
-# Bonferroni Correction For Multi Test  on Location
-m_loc <- nlevels(aida$Location)
+# Bonferroni Correction For Multi Test on Location
+m_loc <- nlevels(aida$Location) + 1
 bonf_alfa.loc <- 1-(0.05/m_loc)
+
 
 get_ztest.location = function(location, aida_attr){
   
@@ -111,22 +146,10 @@ get_ztest.location = function(location, aida_attr){
   print(location)
  
   # same shape test for wilcox assumption
-  
-  Z = mean(fullX) - mean(fullY)
-  fullX_adjusted = fullX - Z
-  
-  ks.test(fullX_adjusted,fullY)
-  
-  res_kstest<- ks.test(fullX_adjusted,fullY)
-  res_kstest.pval <- res_kstest$p.value
-  same_shape <- (res_kstest.pval >= 0.05)
-  
-  if (same_shape) {    
-    test_list <- wilcox.test(fullX, fullY, conf.int = T, conf.level = bonf_alfa.form ) # p-value = 2.004e-05,  95%CI(0.03241141 0.08756097), DELTA: 0.05999382
-  }
-  else 
-    # large sample, general data assum. 
-    test_list <- z.test(fullX, fullY, sigma.x=sd(fullX), sigma.y=sd(fullY), conf.level = bonf_alfa.form)
+
+  print("wilcox.test")
+    
+  test_list <- wilcox.test(fullX, fullY, conf.int = T, conf.level = bonf_alfa.form ) # p-value = 2.004e-05,  95%CI(0.03241141 0.08756097), DELTA: 0.05999382
   
   return(test_list)
   
@@ -142,93 +165,79 @@ get_ztest.form = function(form, aida_attr){
   
   fullX = aida_attr[year_X & aida_form]
   fullY = aida_attr[year_Y & aida_form]
-  
-  print(form)
-  # same shape test for wilcox assumption
-  
-  Z = mean(fullX) - mean(fullY)
-  fullX_adjusted = fullX - Z
- 
-  ks.test(fullX_adjusted,fullY)
-  
-  res_kstest<- ks.test(fullX_adjusted,fullY)
-  res_kstest.pval <- res_kstest$p.value
-  same_shape <- (res_kstest.pval >= 0.05)
-  
-  if (same_shape) {    
-    test_list <- wilcox.test(fullX, fullY, conf.int = T, conf.level = bonf_alfa.form ) # p-value = 2.004e-05,  95%CI(0.03241141 0.08756097), DELTA: 0.05999382
-  }
-  else 
-    # large sample, general data assum. 
-    test_list <- z.test(fullX, fullY, sigma.x=sd(fullX), sigma.y=sd(fullY), conf.level = bonf_alfa.form)
-  
+
+  test_list <- wilcox.test(fullX, fullY, conf.int = T, conf.level = bonf_alfa.form ) # p-value = 2.004e-05,  95%CI(0.03241141 0.08756097), DELTA: 0.05999382
   return(test_list)
   
 }
 
-########### QUESTION B. 1 ######## SIZE
+########### QUESTION B.1 Size ######## 
+
+# Legal Form
+print("Size")
+print("Industry Form")
+
+wilcox.test(aida_SX, aida_SY, conf.int = T, conf.level = bonf_alfa.form) 
 
 t_list.form_size <- sapply(industry_form, get_ztest.form, aida$Size) 
 
 t_list.form_size['conf.int',]
-
-# z_list.form_size['conf.int',]$Consortium[[2]]
-
-########### QUESTION B.2 ######## SIZE
-
-t_list.loc_size <- sapply(locations, get_ztest.location, aida$Size) 
-
-t_list.loc_size['conf.int',]
+t_list.form_size['estimate',]
+t_list.form_size['p.value',]
 
 
-############ QUESTION 1.0############# AGE #######
+########### QUESTION B.1 Size ######## 
+
+## Location
+
+print("Size")
+print("Location")
+#wilc adjusted
+wilcox.test(aida_SX, aida_SY, conf.int = T, conf.level = bonf_alfa.loc) 
+
+list.loc_size <- sapply(locations, get_ztest.location, aida$Size) 
+
+list.loc_size['estimate',]
+list.loc_size['p.value',]
 
 
-# let's take the two distribution of Size to compare
+############ QUESTION 1.0 AGE ############## 
 
-fullAgeX = aida$Age[year_X]
-fullAgeY = aida$Age[year_Y]
+# let's take the two distribution of Age to compare
 
-# AX = get_best_sample(fullSizeX,1000)
-# AY = get_best_sample(fullSizeY,1000)
+aida_AX = aida_X$Age[aida_X$Legal.form %in% industry_form]
+aida_AY = aida_X$Age[aida_Y$Legal.form %in% industry_form]
 
-plot(density(fullAgeX))
-lines(density(fullAgeY), col="blue")
-
-length(fullAgeX);length(fullAgeY);
-
-# we reject that both sample come the same distribution
-
-# ks.test(AX, AY) # D = 0.049, p-value = 0.1811
-
-ks.test(fullAgeX, fullAgeY) # D = 0.035205, p-value < 2.2e-16
+# we reject H0 that both sample come the same distribution
+ks.test(aida_AX, aida_AY) 
 
 ### GENERAL DATA
 
-# they return the same confidence interval at 95% 
-z.test(fullAgeX, fullAgeY, sigma.x=sd(fullAgeX), sigma.y=sd(fullAgeY)) #  p-value < 2.2e-16 (95%CI: -0.9082662 -0.6223939)
+# z.test(aida_AX, aida_AY, sigma.x=sd(aida_AX), sigma.y=sd(aida_AY)) #  p-value < 2.2e-16 (95%CI: 11.49  11.35)
 
-# wilcox.test(fullAgeX, fullAgeY, conf.int = T) # p-value = 8.181e-09,  95%CI(-0.9082662 -0.6223939), DELTA: -3.275076e-05
+#  wilx assump. --> same shape, checked before
 
-########### QUESTION B. 1 ######## Age
+wilcox.test(aida_AX, aida_AY, conf.int = T) 
 
-z_list.form_size <- sapply(industry_form, get_ztest.form, aida$Size) 
+########### QUESTION B. 1 Age ######## 
 
-z_list.form_size['conf.int',]
+## Legal Form
+wilcox.test(aida_AX, aida_AY, conf.int = T, conf.level = bonf_alfa.form) 
+list.form_age <- sapply(industry_form, get_ztest.form, aida$Age) 
 
-# z_list.form_size['conf.int',]$Consortium[[2]]
+list.form_age["conf.int",]
+list.form_age['estimate',]
+list.form_age['p.value',]
 
-########### QUESTION B.1 ######## Age
-
-z_list.form_age <- sapply(industry_form, get_ztest.form, aida$Age) 
-
-z_list.form_age['conf.int',]
 
 ########### QUESTION B.2 ######## Age
 
-z_list.loc_age <- sapply(locations, get_ztest.location, aida$Age) 
+## LOcation
+wilcox.test(aida_AX, aida_AY, conf.int = T, conf.level = bonf_alfa.loc) 
+list.loc_age <- sapply(locations, get_ztest.location, aida$Age) 
 
-z_list.loc_age['conf.int',]
+list.loc_age[c('conf.int',"method"),]
+list.loc_age["conf.int",]
+list.loc_age['estimate',]
+list.loc_age['p.value',]
 
-
-######### QUESTION C ##########
